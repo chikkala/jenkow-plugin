@@ -34,6 +34,7 @@ import hudson.util.FormValidation;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashMap;
@@ -75,7 +76,7 @@ public class JenkowBuilder extends Builder{
     }
     
     @Override
-    public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) {
+    public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, FileNotFoundException {
         PrintStream log = listener.getLogger();
         BuildLoggerMap.put(build,log);
         
@@ -99,6 +100,9 @@ public class JenkowBuilder extends Builder{
             if (!wff.exists()) log.println("error: "+wff+" does not exist");
             String wfn = wff+"20.xml"; // TODO 9: workaround for http://forums.activiti.org/en/viewtopic.php?f=8&t=3745&start=10
             DeploymentBuilder db = repoSvc.createDeployment().addInputStream(wfn,new FileInputStream(wff));
+
+            // skip XML Schema validation as documents produced by Activiti designer doesn't seem to conform to them
+//            ((DeploymentBuilderImpl)db).getDeployment().setValidatingSchema(false);
 
             // TODO 7: We should avoid redeploying here, if workflow is already deployed?
             Deployment d = db.deploy();
@@ -127,8 +131,6 @@ public class JenkowBuilder extends Builder{
                 }
                 Thread.sleep(1000);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         } finally {
         	Thread.currentThread().setContextClassLoader(previous);
         	BuildLoggerMap.remove(build);
@@ -257,7 +259,12 @@ public class JenkowBuilder extends Builder{
         }
 
 		File getWorkflowFile(String wfName){
-            return new File(getEffectiveWorkflowRepoRoot(),EclipseResources.mkWfPath(wfName)).getAbsoluteFile();
+            File wff = new File(wfName);
+			if (wff.isAbsolute()){
+				return wff;
+            }else{
+            	return new File(getEffectiveWorkflowRepoRoot(),EclipseResources.mkWfPath(wfName)).getAbsoluteFile();
+            }
         }
 		
 		public JenkowEngineConfig getEngineConfig(){
